@@ -1,6 +1,8 @@
 package simpledb.opt;
 
 import java.util.Map;
+
+import simpledb.materialize.HashJoinPlan;
 import simpledb.tx.Transaction;
 import simpledb.record.*;
 import simpledb.query.*;
@@ -66,14 +68,24 @@ class TablePlanner {
       Predicate joinpred = mypred.joinSubPred(myschema, currsch);
       if (joinpred == null)
          return null;
-      // Prefer an index join (equality only), then a sort-merge join
+      // Prefer an index join (equality only),
+      // then a compares a sort-merge join and a hash join
       // (also equality only, but doesn't need an index), then fall
       // back to a nested-loops join, which handles any predicate.
       Plan p = makeIndexJoin(current, currsch);
-      if (p == null)
-         p = makeMergeJoin(current, currsch);
-      if (p == null)
+      if (p != null)
+         return p;
+      Plan ph = makeHashJoin(current, currsch);
+      Plan pm = makeMergeJoin(current, currsch);
+      if (ph == null && pm == null)
          p = makeProductJoin(current, currsch);
+      else if (ph == null)
+         p = pm;
+      else if (pm == null || ph.blocksAccessed() <= pm.blocksAccessed())
+         p = ph;
+      else
+         p = pm;
+      System.out.println(p.getClass().getName());
       return p;
    }
    
@@ -112,7 +124,25 @@ class TablePlanner {
       }
       return null;
    }
-   
+
+   /**
+    * Constructs a hash join plan  of the specified plan and
+    * this table, if the query predicate contains an equality
+    * between a field of this table and a field of the specified
+    * plan. Returns null if no such equality exists.
+    */
+   private Plan makeHashJoin(Plan current, Schema currsch) {
+      for (String fldname : myschema.fields()) {
+         String outerfield = mypred.equatesWithField(fldname);
+         if (outerfield != null && currsch.hasField(outerfield)) {
+            Plan p = addSelectPred(myplan);
+            Plan mjp = new HashJoinPlan(tx, current, p, outerfield, fldname);
+            return addJoinPred(mjp, currsch);
+         }
+      }
+      return null;
+   }
+
    /**
     * Constructs a sort-merge join plan of the specified plan and
     * this table, if the query predicate contains an equality
