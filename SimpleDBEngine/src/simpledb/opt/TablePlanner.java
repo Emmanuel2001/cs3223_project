@@ -68,24 +68,27 @@ class TablePlanner {
       Predicate joinpred = mypred.joinSubPred(myschema, currsch);
       if (joinpred == null)
          return null;
-      // Prefer an index join (equality only),
-      // then a compares a sort-merge join and a hash join
-      // (also equality only, but doesn't need an index), then fall
-      // back to a nested-loops join, which handles any predicate.
-      Plan p = makeIndexJoin(current, currsch);
-      if (p != null)
-         return p;
-      Plan ph = makeHashJoin(current, currsch);
-      Plan pm = makeMergeJoin(current, currsch);
-      if (ph == null && pm == null)
+      // index join first, then the cheaper of hash and merge join, else nested loops
+      String method = "index join";
+      Plan p = JoinMethods.INDEX ? makeIndexJoin(current, currsch) : null;
+      if (p == null) {
+         Plan ph = JoinMethods.HASH  ? makeHashJoin(current, currsch)  : null;
+         Plan pm = JoinMethods.MERGE ? makeMergeJoin(current, currsch) : null;
+         if (ph != null && (pm == null || ph.blocksAccessed() <= pm.blocksAccessed())) {
+            p = ph;
+            method = "hash join";
+         }
+         else if (pm != null) {
+            p = pm;
+            method = "sort-merge join";
+         }
+      }
+      if (p == null) {
          p = makeProductJoin(current, currsch);
-      else if (ph == null)
-         p = pm;
-      else if (pm == null || ph.blocksAccessed() <= pm.blocksAccessed())
-         p = ph;
-      else
-         p = pm;
-      System.out.println(p.getClass().getName());
+         method = "nested-loops join";
+      }
+      if (JoinMethods.TRACE)
+         System.out.println("join method: " + method);
       return p;
    }
    
@@ -125,12 +128,7 @@ class TablePlanner {
       return null;
    }
 
-   /**
-    * Constructs a hash join plan  of the specified plan and
-    * this table, if the query predicate contains an equality
-    * between a field of this table and a field of the specified
-    * plan. Returns null if no such equality exists.
-    */
+   // null if no equality links this table to the current plan
    private Plan makeHashJoin(Plan current, Schema currsch) {
       for (String fldname : myschema.fields()) {
          String outerfield = mypred.equatesWithField(fldname);
@@ -143,15 +141,7 @@ class TablePlanner {
       return null;
    }
 
-   /**
-    * Constructs a sort-merge join plan of the specified plan and
-    * this table, if the query predicate contains an equality
-    * between a field of this table and a field of the specified
-    * plan. Returns null if no such equality exists.
-    * @param current the specified plan
-    * @param currsch the schema of the specified plan
-    * @return a merge join plan, or null if none is possible
-    */
+   // null if no equality links this table to the current plan
    private Plan makeMergeJoin(Plan current, Schema currsch) {
       for (String fldname : myschema.fields()) {
          String outerfield = mypred.equatesWithField(fldname);
@@ -164,17 +154,7 @@ class TablePlanner {
       return null;
    }
 
-   /**
-    * Constructs a nested-loops join plan of the specified plan and
-    * this table. Unlike an index or merge join, this handles any
-    * join predicate (not just equality), and is the fallback when
-    * neither of those applies. The join predicate is evaluated
-    * directly by the scan, so (per the assignment) there is no
-    * separate selection operation layered on top.
-    * @param current the specified plan
-    * @param currsch the schema of the specified plan
-    * @return a nested-loops join plan of the specified plan and this table
-    */
+   // fallback: handles any join predicate
    private Plan makeProductJoin(Plan current, Schema currsch) {
       Plan p = addSelectPred(myplan);
       Predicate joinpred = mypred.joinSubPred(currsch, myschema);

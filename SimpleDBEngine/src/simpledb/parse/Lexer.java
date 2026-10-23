@@ -138,12 +138,7 @@ public class Lexer {
       return s;
    }
    
-   /**
-    * Throws an exception if the current token is not a comparison
-    * operator. Otherwise, consumes it (and a second character if
-    * needed for <=, >=, !=, <>) and returns the operator as a String.
-    * @return the string value of the comparison operator
-    */
+   // eats a comparison operator and returns it as a string
    public String eatOpr() {
       String opr;
       if (matchDelim('<')) {
@@ -189,6 +184,7 @@ public class Lexer {
       keywords = Arrays.asList("select", "from", "where", "and",
                                "insert", "into", "values", "delete", "update", "set",
                                "create", "table", "int", "varchar", "view", "as", "index", "on", "using", "hash", "btree",
-                               "order", "by", "asc", "desc");
+                               "order", "by", "asc", "desc", "group",
+                               "distinct", "explain", "display", "union", "intersect", "except", "all");
    }
-}
+}

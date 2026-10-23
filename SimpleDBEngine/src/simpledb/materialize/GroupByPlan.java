@@ -5,6 +5,8 @@ import simpledb.tx.Transaction;
 import simpledb.record.Schema;
 import simpledb.plan.Plan;
 import simpledb.query.*;
+import simpledb.parse.QueryData;
+import java.sql.Types;
 
 /**
  * The Plan class for the <i>groupby</i> operator.
@@ -37,6 +39,24 @@ public class GroupByPlan implements Plan {
          sch.addIntField(fn.fieldName());
    }
    
+   public static Plan forQuery(Transaction tx, Plan p, QueryData data) {
+      Schema sch = p.schema();
+      for (String f : data.groupFields())
+         if (!sch.hasField(f))
+            throw new IllegalArgumentException("unknown group by field: " + f);
+      for (int i = 0; i < data.aggFuncs().size(); i++) {
+         String func = data.aggFuncs().get(i);
+         String f = data.aggFields().get(i);
+         if (func.equals("count") && f.equals("*"))
+            continue;   // count(*) needs no particular field
+         if (!sch.hasField(f))
+            throw new IllegalArgumentException("unknown field in " + func + "(" + f + ")");
+         if (!func.equals("count") && sch.type(f) != Types.INTEGER)
+            throw new IllegalArgumentException(func + "(" + f + ") needs an integer field");
+      }
+      return new GroupByPlan(tx, p, data.groupFields(), data.aggregationFns());
+   }
+
    /**
     * This method opens a sort plan for the specified plan.
     * The sort plan ensures that the underlying records
@@ -97,5 +117,16 @@ public class GroupByPlan implements Plan {
     */
    public Schema schema() {
       return sch;
+   }
+
+   public String describe() {
+      List<String> names = new ArrayList<String>();
+      for (AggregationFn fn : aggfns)
+         names.add(fn.fieldName());
+      return "GroupBy " + groupfields + " computing " + names;
+   }
+
+   public List<Plan> children() {
+      return Arrays.asList(p);
    }
 }

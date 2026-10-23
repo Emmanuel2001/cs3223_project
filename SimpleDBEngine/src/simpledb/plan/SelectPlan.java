@@ -83,4 +83,12 @@ public class SelectPlan implements Plan {
    public Schema schema() {
       return p.schema();
    }
+
+   public String describe() {
+      return "Select [" + pred + "]";
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(p);
+   }
 }

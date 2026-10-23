@@ -7,156 +7,157 @@ import simpledb.query.UpdateScan;
 import simpledb.record.Schema;
 import simpledb.tx.Transaction;
 
-
 import java.util.*;
 
-/**
- * The Scan class for the <i>hashjoin</i> operator.
- * A static hash implementation.
- * A fixed number of buckets is allocated (currently, 100),
- * and each bucket is implemented as an Arraylist
- */
 public class HashJoinScan implements Scan {
-   public static int NUM_BUCKETS = 100;
+   public static int MAX_PARTITIONS = 100;
 
-   private final Transaction tx;
-   private final Scan s1;
-   private final Plan p2;
+   private final Schema sch1, sch2;
    private final String fldname1, fldname2;
-   private Map<Integer, UpdateScan> hashTable;
-   private Constant currentS1Value = null;
-   private UpdateScan currentBucket;
-   
-   /**
-    * Create a hash join scan for the two underlying plans.
-    * @param p1 the LHS plan
-    * @param p2 the RHS plan, which will be partitioned
-    * @param fldname1 the LHS join field
-    * @param fldname2 the RHS join field
-    */
+   private final int numparts;
+   private final TempTable[] parts1, parts2;
+   private final boolean[] has1, has2;   // is the partition non-empty?
+
+   private int curpart = -1;
+   private Scan probe = null;                       // current left partition
+   private Map<Constant,List<Map<String,Constant>>> table = null; // right partition
+   private Iterator<Map<String,Constant>> matches = null;
+   private Map<String,Constant> currentRight = null;
+
    public HashJoinScan(Transaction tx, Plan p1, Plan p2, String fldname1, String fldname2) {
-      this.tx = tx;
-      this.s1 = p1.open();
-      this.p2 = p2;
+      this.sch1 = p1.schema();
+      this.sch2 = p2.schema();
       this.fldname1 = fldname1;
       this.fldname2 = fldname2;
 
-      // Build hash table from s2
-      buildHashTable();
-   }
-
-   private int bucketIndex(Constant key) {
-      return key.hashCode() % NUM_BUCKETS;
-   }
-
-   private void copyRecord(Schema sch, Scan from, UpdateScan to) {
-      to.insert();
-      sch.fields().forEach(name -> to.setVal(name, from.getVal(name)));
-   }
-   
-   private void buildHashTable() {
-      hashTable = new HashMap<>();
-
+      // open both inputs first so availableBuffs() counts their pinned buffers
+      Scan s1 = p1.open();
       Scan s2 = p2.open();
-      s2.beforeFirst();
-      
-      while (s2.next()) {
-         int idx = bucketIndex(s2.getVal(fldname2));
+      // keep one buffer in reserve (moving to a new block pins it briefly)
+      numparts = Math.max(1, Math.min(MAX_PARTITIONS, tx.availableBuffs() - 1));
 
-         UpdateScan bucket = hashTable.computeIfAbsent(idx, _ -> {
-            TempTable t = new TempTable(tx, p2.schema());
-            UpdateScan s = t.open();
-            s.beforeFirst();
-            return s;
-         });
-         copyRecord(p2.schema(), s2, bucket);
+      parts1 = new TempTable[numparts];
+      parts2 = new TempTable[numparts];
+      has1 = new boolean[numparts];
+      has2 = new boolean[numparts];
+      for (int i = 0; i < numparts; i++) {
+         parts1[i] = new TempTable(tx, sch1);
+         parts2[i] = new TempTable(tx, sch2);
       }
 
+      partition(s1, sch1, fldname1, parts1, has1);
+      partition(s2, sch2, fldname2, parts2, has2);
+      s1.close();
       s2.close();
    }
-   
-   /**
-    * Position the scan before its first record.
-    * @see simpledb.query.Scan#beforeFirst()
-    */
-   public void beforeFirst() {
-      s1.beforeFirst();
+
+   private int partitionOf(Constant key) {
+      return Math.floorMod(key.hashCode(), numparts);
    }
-   
-   /**
-    * Move to the next record where s1 and s2 join.
-    * @see simpledb.query.Scan#next()
-    */
+
+   private void partition(Scan src, Schema sch, String fld,
+                          TempTable[] parts, boolean[] nonempty) {
+      UpdateScan[] outs = new UpdateScan[numparts];   // opened lazily
+      src.beforeFirst();
+      while (src.next()) {
+         int i = partitionOf(src.getVal(fld));
+         if (outs[i] == null)
+            outs[i] = parts[i].open();
+         nonempty[i] = true;
+         outs[i].insert();
+         for (String name : sch.fields())
+            outs[i].setVal(name, src.getVal(name));
+      }
+      for (UpdateScan out : outs)
+         if (out != null)
+            out.close();
+   }
+
+   private void loadTable(int i) {
+      table = new HashMap<>();
+      Scan s = parts2[i].open();
+      s.beforeFirst();
+      while (s.next()) {
+         Map<String,Constant> rec = new HashMap<>();
+         for (String name : sch2.fields())
+            rec.put(name, s.getVal(name));
+         table.computeIfAbsent(rec.get(fldname2), k -> new ArrayList<>()).add(rec);
+      }
+      s.close();
+   }
+
+   private void closeProbe() {
+      if (probe != null) {
+         probe.close();
+         probe = null;
+      }
+   }
+
+   private boolean nextPartition() {
+      closeProbe();
+      table = null;
+      matches = null;
+      while (curpart < numparts - 1) {
+         curpart++;
+         if (!has1[curpart] || !has2[curpart])
+            continue;
+         loadTable(curpart);
+         probe = parts1[curpart].open();
+         probe.beforeFirst();
+         return true;
+      }
+      curpart = numparts;
+      return false;
+   }
+
+   public void beforeFirst() {
+      closeProbe();
+      table = null;
+      matches = null;
+      currentRight = null;
+      curpart = -1;
+   }
+
    public boolean next() {
       while (true) {
-         // If we have a current bucket, try next record in bucket
-         while (currentBucket != null && currentBucket.next()) {
-            if (currentBucket.getVal(fldname2).equals(currentS1Value))
-               return true;
+         if (matches != null && matches.hasNext()) {
+            currentRight = matches.next();
+            return true;
          }
-         
-         // Try move to next s1 record
-         if (!s1.next()) {
+         matches = null;
+         if (probe != null && probe.next()) {
+            List<Map<String,Constant>> l = table.get(probe.getVal(fldname1));
+            if (l != null)
+               matches = l.iterator();
+            continue;
+         }
+         if (curpart >= numparts || !nextPartition())
             return false;
-         }
+      }
+   }
 
-         // Update based on new s1 record
-         currentS1Value = s1.getVal(fldname1);
-         currentBucket = hashTable.get(bucketIndex(currentS1Value));
-         if (currentBucket != null)
-            currentBucket.beforeFirst();
-      }
-   }
-   
-   /**
-    * Return the integer value of the specified field.
-    * @see simpledb.query.Scan#getInt(java.lang.String)
-    */
    public int getInt(String fldname) {
-      if (s1.hasField(fldname))
-         return s1.getInt(fldname);
-      else
-         return currentBucket.getInt(fldname);
+      return getVal(fldname).asInt();
    }
-   
-   /**
-    * Return the string value of the specified field.
-    * @see simpledb.query.Scan#getString(java.lang.String)
-    */
+
    public String getString(String fldname) {
-      if (s1.hasField(fldname))
-         return s1.getString(fldname);
-      else
-         return currentBucket.getString(fldname);
+      return getVal(fldname).asString();
    }
-   
-   /**
-    * Return the value of the specified field.
-    * @see simpledb.query.Scan#getVal(java.lang.String)
-    */
+
    public Constant getVal(String fldname) {
-      if (s1.hasField(fldname))
-         return s1.getVal(fldname);
+      if (sch1.hasField(fldname))
+         return probe.getVal(fldname);
       else
-         return currentBucket.getVal(fldname);
+         return currentRight.get(fldname);
    }
-   
-   /**
-    * Return true if the specified field is in either underlying scan.
-    * @see simpledb.query.Scan#hasField(java.lang.String)
-    */
+
    public boolean hasField(String fldname) {
-      return s1.hasField(fldname) || p2.schema().hasField(fldname);
+      return sch1.hasField(fldname) || sch2.hasField(fldname);
    }
-   
-   /**
-    * Close both underlying scans.
-    * @see simpledb.query.Scan#close()
-    */
+
    public void close() {
-      s1.close();
-      for (UpdateScan b: hashTable.values()) {
-         b.close();
-      }
+      closeProbe();
+      table = null;
+      matches = null;
    }
 }

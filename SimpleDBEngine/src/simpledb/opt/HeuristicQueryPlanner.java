@@ -29,8 +29,14 @@ public class HeuristicQueryPlanner implements QueryPlanner {
     */
    public Plan createPlan(QueryData data, Transaction tx) {
       
+      if (data.hasSetOps())
+         return SetOpPlanner.plan(this, data, tx);
+      StarExpander.expand(data, tx, mdm);   // select * -> explicit field list
+      tableplanners = new ArrayList<>();   // start clean even if an earlier query failed half-way
       // Step 1:  Create a TablePlanner object for each mentioned table
       for (String tblname : data.tables()) {
+         if (mdm.getViewDef(tblname, tx) != null)
+            throw new IllegalArgumentException("views are not supported by the heuristic query planner: " + tblname);
          TablePlanner tp = new TablePlanner(tblname, data.pred(), tx, mdm);
          tableplanners.add(tp);
       }
@@ -47,11 +53,33 @@ public class HeuristicQueryPlanner implements QueryPlanner {
             currentplan = getLowestProductPlan(currentplan);
       }
       
-      // Step 4.  Project on the field names
+      // group by / aggregates
+      if (data.hasAggregation())
+         currentplan = GroupByPlan.forQuery(tx, currentplan, data);
+
+      // order by on a field that is not selected: sort before projecting
+      boolean sortfirst = false;
+      if (data.hasOrderBy()) {
+         for (String f : data.sortFields()) {
+            if (!currentplan.schema().hasField(f))
+               throw new IllegalArgumentException("unknown field in order by: " + f);
+            if (!data.fields().contains(f))
+               sortfirst = true;
+         }
+         if (sortfirst && data.isDistinct())
+            throw new IllegalArgumentException(
+                  "with DISTINCT, the order by fields must appear in the select list");
+         if (sortfirst)
+            currentplan = new SortPlan(tx, currentplan, data.sortFields(), data.sortOrders());
+      }
       Plan projectplan = new ProjectPlan(currentplan, data.fields());
 
-      // Step 5.  If there's an order by clause, sort on it
-      if (data.hasOrderBy())
+      // distinct
+      if (data.isDistinct())
+         projectplan = new DistinctPlan(tx, projectplan);
+
+      // order by
+      if (data.hasOrderBy() && !sortfirst)
          return new SortPlan(tx, projectplan, data.sortFields(), data.sortOrders());
       return projectplan;
    }

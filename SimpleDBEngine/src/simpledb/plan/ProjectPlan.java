@@ -69,4 +69,12 @@ public class ProjectPlan implements Plan {
    public Schema schema() {
       return schema;
    }
+
+   public String describe() {
+      return "Project " + schema.fields();
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(p);
+   }
 }

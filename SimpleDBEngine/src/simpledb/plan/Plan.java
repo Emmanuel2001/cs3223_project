@@ -45,4 +45,12 @@ public interface Plan {
     * @return the query's schema
     */
    public Schema schema();
+
+   public default String describe() {
+      return getClass().getSimpleName();
+   }
+
+   public default java.util.List<Plan> children() {
+      return java.util.Collections.emptyList();
+   }
 }

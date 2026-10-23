@@ -7,6 +7,7 @@ package simpledb.query;
  */
 public class ProductScan implements Scan {
    private Scan s1, s2;
+   private boolean hasmore1;   // does the LHS scan have a current record?
 
    /**
     * Create a product scan having the two underlying scans.
@@ -28,7 +29,7 @@ public class ProductScan implements Scan {
     */
    public void beforeFirst() {
       s1.beforeFirst();
-      s1.next();
+      hasmore1 = s1.next();   // false if the LHS is empty: the product is then empty
       s2.beforeFirst();
    }
 
@@ -41,11 +42,14 @@ public class ProductScan implements Scan {
     * @see simpledb.query.Scan#next()
     */
    public boolean next() {
+      if (!hasmore1)
+         return false;
       if (s2.next())
          return true;
       else {
          s2.beforeFirst();
-         return s2.next() && s1.next();
+         hasmore1 = s1.next();
+         return hasmore1 && s2.next();
       }
    }
 

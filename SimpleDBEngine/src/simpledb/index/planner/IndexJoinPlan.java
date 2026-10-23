@@ -88,4 +88,12 @@ public class IndexJoinPlan implements Plan {
    public Schema schema() {
       return sch;
    }
+
+   public String describe() {
+      return "IndexJoin [" + joinfield + " = " + ii.fieldName() + ", " + ii.indexType() + " index]";
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(p1, p2);
+   }
 }

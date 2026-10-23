@@ -26,6 +26,10 @@ public class Predicate {
       terms.add(t);
    }
 
+   public List<Term> terms() {
+      return Collections.unmodifiableList(terms);
+   }
+
    /**
     * Modifies the predicate to be the conjunction of
     * itself and the specified predicate.

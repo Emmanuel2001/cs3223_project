@@ -76,4 +76,12 @@ public class IndexSelectPlan implements Plan {
    public Schema schema() {
       return p.schema(); 
    }
+
+   public String describe() {
+      return "IndexSelect [" + ii.indexType() + " index on " + ii.fieldName() + " = " + val + "]";
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(p);
+   }
 }

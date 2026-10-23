@@ -2,6 +2,8 @@ package simpledb.plan;
 
 import simpledb.tx.Transaction;
 import simpledb.parse.*;
+import simpledb.materialize.ExplainPlan;
+import simpledb.metadata.MetadataMgr;
 
 /**
  * The object that executes SQL statements.
@@ -10,10 +12,16 @@ import simpledb.parse.*;
 public class Planner {
    private QueryPlanner qplanner;
    private UpdatePlanner uplanner;
+   private Verifier verifier;   // null: no verification
    
    public Planner(QueryPlanner qplanner, UpdatePlanner uplanner) {
+      this(qplanner, uplanner, null);
+   }
+
+   public Planner(QueryPlanner qplanner, UpdatePlanner uplanner, MetadataMgr mdm) {
       this.qplanner = qplanner;
       this.uplanner = uplanner;
+      this.verifier = mdm == null ? null : new Verifier(mdm);
    }
    
    /**
@@ -25,8 +33,11 @@ public class Planner {
    public Plan createQueryPlan(String qry, Transaction tx) {
       Parser parser = new Parser(qry);
       QueryData data = parser.query();
-      verifyQuery(data);
-      return qplanner.createPlan(data, tx);
+      if (verifier != null) verifier.verifyQuery(data, tx);
+      Plan p = qplanner.createPlan(data, tx);
+      if (data.isExplain())
+         return new ExplainPlan(p);   // describe the plan instead of running it
+      return p;
    }
    
    /**
@@ -42,7 +53,7 @@ public class Planner {
    public int executeUpdate(String cmd, Transaction tx) {
       Parser parser = new Parser(cmd);
       Object data = parser.updateCmd();
-      verifyUpdate(data);
+      if (verifier != null) verifier.verifyUpdate(data, tx);
       if (data instanceof InsertData)
          return uplanner.executeInsert((InsertData)data, tx);
       else if (data instanceof DeleteData)
@@ -57,13 +68,5 @@ public class Planner {
          return uplanner.executeCreateIndex((CreateIndexData)data, tx);
       else
          return 0;
-   }
- 
-   // SimpleDB does not verify queries, although it should.
-   private void verifyQuery(QueryData data) {
-   }
-
-   // SimpleDB does not verify updates, although it should.
-   private void verifyUpdate(Object data) {
    }
 }

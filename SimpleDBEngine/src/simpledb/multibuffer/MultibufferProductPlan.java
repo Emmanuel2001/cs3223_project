@@ -112,4 +112,12 @@ public class MultibufferProductPlan implements Plan {
       dest.close();
       return t;
    }
+
+   public String describe() {
+      return "MultibufferProduct";
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(lhs, rhs);
+   }
 }

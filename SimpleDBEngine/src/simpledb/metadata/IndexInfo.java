@@ -7,7 +7,6 @@ import simpledb.index.Index;
 import simpledb.index.hash.HashIndex; 
 import simpledb.index.btree.BTreeIndex; //in case we change to btree indexing
 
-
 /**
  * The information about an index.
  * This information is used by the query planner in order to
@@ -113,5 +112,13 @@ public class IndexInfo {
          sch.addStringField("dataval", fldlen);
       }
       return new Layout(sch);
+   }
+
+   public String fieldName() {
+      return fldname;
+   }
+
+   public String indexType() {
+      return idxtype;
    }
 }

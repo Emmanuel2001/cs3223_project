@@ -62,7 +62,16 @@ public class MergeJoinPlan implements Plan {
     * @see simpledb.plan.Plan#blocksAccessed()
     */
    public int blocksAccessed() {
-      return p1.blocksAccessed() + p2.blocksAccessed();
+      // merge pass plus the one-time cost of sorting both inputs
+      return p1.blocksAccessed() + p2.blocksAccessed()
+           + sortCost(p1) + sortCost(p2);
+   }
+
+   // sort cost: one pass for the runs, then about log2(N) merge passes of 2*N blocks
+   private static int sortCost(Plan sorted) {
+      int n = Math.max(1, sorted.blocksAccessed());
+      int passes = 1 + (int) Math.ceil(Math.log(n) / Math.log(2));
+      return 2 * n * passes;
    }
    
    /**
@@ -98,5 +107,12 @@ public class MergeJoinPlan implements Plan {
    public Schema schema() {
       return sch;
    }
-}
 
+   public String describe() {
+      return "SortMergeJoin [" + fldname1 + " = " + fldname2 + "]";
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(p1, p2);
+   }
+}

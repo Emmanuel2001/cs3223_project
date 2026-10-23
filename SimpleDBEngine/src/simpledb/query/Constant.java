@@ -16,6 +16,10 @@ public class Constant implements Comparable<Constant> {
       this.sval = sval;
    }
    
+   public boolean isInt() {
+      return ival != null;
+   }
+
    public int asInt() {
       return ival;
    }

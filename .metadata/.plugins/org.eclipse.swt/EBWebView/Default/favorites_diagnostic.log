@@ -135,3 +135,23 @@
 2026-10-18 11:45:49.074: [INFO] BookmarkModelLoaded, ids_reassigned: 0
 2026-10-18 11:45:49.074: [INFO] BookmarksLoadDropped droppedNodes=0
 2026-10-18 11:45:49.074: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-10-23 10:58:44.735: [INFO] CurrentProfilePath: D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default
+2026-10-23 10:58:44.735: [INFO] Profiles total count: 1
+2026-10-23 10:58:44.735: [INFO] Profile: name=Profile 1 path=D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default lastActive=2026-10-18T11:47:06.445Z
+2026-10-23 10:58:44.735: [INFO] LastUsedProfileDir: D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default
+2026-10-23 10:58:44.735: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default lastActive=2026-10-18T11:47:06.445Z
+2026-10-23 10:58:44.735: [INFO] OnDoneLoading sync enabled: 0
+2026-10-23 10:58:44.735: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-10-23 10:58:44.735: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-10-23 10:58:44.735: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-10-23 11:38:54.985: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-10-23 12:57:30.836: [INFO] CurrentProfilePath: D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default
+2026-10-23 12:57:30.836: [INFO] Profiles total count: 1
+2026-10-23 12:57:30.836: [INFO] Profile: name=Profile 1 path=D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default lastActive=2026-10-18T11:47:06.445Z
+2026-10-23 12:57:30.836: [INFO] LastUsedProfileDir: D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default
+2026-10-23 12:57:30.836: [INFO] MostRecentlyActiveProfile: name=Profile 1 path=D:\NUS\final-sem\workspace\.metadata\.plugins\org.eclipse.swt\EBWebView\Default lastActive=2026-10-18T11:47:06.445Z
+2026-10-23 12:57:30.836: [INFO] OnDoneLoading sync enabled: 0
+2026-10-23 12:57:30.836: [INFO] BookmarkModelLoaded, ids_reassigned: 0
+2026-10-23 12:57:30.836: [INFO] BookmarksLoadDropped droppedNodes=0
+2026-10-23 12:57:30.836: [INFO] BookmarksSnapshot Startup total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1
+2026-10-23 14:11:46.331: [INFO] BookmarksSnapshot Shutdown total=0 bar=0 other=0 mobile=0 showBar=0 showBarNTP=1

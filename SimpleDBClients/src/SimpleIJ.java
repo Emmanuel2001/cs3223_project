@@ -18,7 +18,7 @@ public class SimpleIJ {
             String cmd = sc.nextLine().trim();
             if (cmd.startsWith("exit"))
                break;
-            else if (cmd.startsWith("select"))
+            else if (cmd.startsWith("select") || cmd.startsWith("explain") || cmd.startsWith("display"))
                doQuery(stmt, cmd);
             else
                doUpdate(stmt, cmd);
@@ -33,6 +33,12 @@ public class SimpleIJ {
 
    private static void doQuery(Statement stmt, String cmd) {
       try (ResultSet rs = stmt.executeQuery(cmd)) {
+         // explain/display returns the query plan as lines of text: print them as is
+         if (cmd.startsWith("explain") || cmd.startsWith("display")) {
+            while (rs.next())
+               System.out.println(rs.getString("plan"));
+            return;
+         }
          ResultSetMetaData md = rs.getMetaData();
          int numcols = md.getColumnCount();
          int totalwidth = 0;
@@ -82,4 +88,4 @@ public class SimpleIJ {
          System.out.println("SQL Exception: " + e.getMessage());
       }
    }
-}
+}

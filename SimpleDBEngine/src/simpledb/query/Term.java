@@ -138,6 +138,18 @@ public class Term {
     * @param sch the schema
     * @return true if both expressions apply to the schema
     */
+   public Expression lhs() {
+      return lhs;
+   }
+
+   public Expression rhs() {
+      return rhs;
+   }
+
+   public String operator() {
+      return opr;
+   }
+
    public boolean appliesTo(Schema sch) {
       return lhs.appliesTo(sch) && rhs.appliesTo(sch);
    }

@@ -36,13 +36,15 @@ public class HashJoinPlan implements Plan {
 
     /**
      * Return the number of blocks accessed during the join.
-     * For hashjoin, this is the sum of the blocks accessed
-     * to read each input relation once.
+     * Partition-based hash join reads each input once and writes its
+     * partitions, then reads every partition once more:
+     * <pre> 3 * (B(p1) + B(p2)) </pre>
+     * (the standard estimate, assuming each right partition fits in memory).
      * @see simpledb.plan.Plan#blocksAccessed()
      */
     @Override
     public int blocksAccessed() {
-        return p1.blocksAccessed() + p2.blocksAccessed();
+        return 3 * (p1.blocksAccessed() + p2.blocksAccessed());
     }
 
     /**
@@ -51,10 +53,12 @@ public class HashJoinPlan implements Plan {
      * <pre> R(join(p1,p2)) = R(p1)*R(p2)/max{V(p1,F1),V(p2,F2)}</pre>
      * @see simpledb.plan.Plan#recordsOutput()
      */
+    @Override
     public int recordsOutput() {
-        int maxvals = Math.max(p1.distinctValues(fldname1),
-                p2.distinctValues(fldname2));
-        return (p1.recordsOutput() * p2.recordsOutput()) / maxvals;
+        int maxvals = Math.max(1, Math.max(p1.distinctValues(fldname1),
+                p2.distinctValues(fldname2)));
+        long out = ((long) p1.recordsOutput() * p2.recordsOutput()) / maxvals;
+        return (int) Math.min(Integer.MAX_VALUE, out);
     }
 
     /**
@@ -74,5 +78,15 @@ public class HashJoinPlan implements Plan {
     @Override
     public Schema schema() {
         return sch;
+    }
+
+    @Override
+    public String describe() {
+        return "HashJoin [" + fldname1 + " = " + fldname2 + "]";
+    }
+
+    @Override
+    public java.util.List<Plan> children() {
+        return java.util.Arrays.asList(p1, p2);
     }
 }

@@ -18,6 +18,9 @@ public class SortScan implements Scan {
    private RecordComparator comp;
    private boolean hasmore1, hasmore2=false;
    private List<RID> savedposition;
+   // which run is current, and whether each run has more records
+   private UpdateScan savedcurrent;
+   private boolean savedhasmore1, savedhasmore2;
    
    /**
     * Create a sort scan, given a list of 1 or 2 runs.
@@ -136,6 +139,9 @@ public class SortScan implements Scan {
       RID rid1 = s1.getRid();
       RID rid2 = (s2 == null) ? null : s2.getRid();
       savedposition = Arrays.asList(rid1,rid2);
+      savedcurrent  = currentscan;
+      savedhasmore1 = hasmore1;
+      savedhasmore2 = hasmore2;
    }
    
    /**
@@ -147,5 +153,12 @@ public class SortScan implements Scan {
       s1.moveToRid(rid1);
       if (rid2 != null)
          s2.moveToRid(rid2);
+      // Restoring only the record positions is not enough: without these,
+      // the scan may report the wrong run's record as current (or think a
+      // run is exhausted), which loses or duplicates rows in a merge join
+      // with duplicate join values.
+      currentscan = savedcurrent;
+      hasmore1    = savedhasmore1;
+      hasmore2    = savedhasmore2;
    }
 }

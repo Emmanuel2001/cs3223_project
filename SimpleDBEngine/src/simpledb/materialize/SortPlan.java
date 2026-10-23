@@ -15,6 +15,7 @@ public class SortPlan implements Plan {
    private Plan p;
    private Schema sch;
    private RecordComparator comp;
+   private String sortdesc;
    
    /**
     * Create a sort plan for the specified query, sorting all fields
@@ -28,6 +29,9 @@ public class SortPlan implements Plan {
       this.p = p;
       sch = p.schema();
       comp = new RecordComparator(sortfields);
+      sortdesc = "";
+      for (int i = 0; i < sortfields.size(); i++)
+         sortdesc += (i > 0 ? ", " : "") + sortfields.get(i) + " asc";
    }
 
    /**
@@ -44,6 +48,10 @@ public class SortPlan implements Plan {
       this.p = p;
       sch = p.schema();
       comp = new RecordComparator(sortfields, sortorders);
+      sortdesc = "";
+      for (int i = 0; i < sortfields.size(); i++)
+         sortdesc += (i > 0 ? ", " : "") + sortfields.get(i)
+                   + (sortorders.get(i) ? " asc" : " desc");
    }
    
    /**
@@ -56,6 +64,9 @@ public class SortPlan implements Plan {
       Scan src = p.open();
       List<TempTable> runs = splitIntoRuns(src);
       src.close();
+      // empty input: use one empty run so SortScan has something to open
+      if (runs.isEmpty())
+         runs.add(new TempTable(tx, sch));
       while (runs.size() > 2)
          runs = doAMergeIteration(runs);
       return new SortScan(runs, comp);
@@ -166,5 +177,13 @@ public class SortPlan implements Plan {
       for (String fldname : sch.fields())
          dest.setVal(fldname, src.getVal(fldname));
       return src.next();
+   }
+
+   public String describe() {
+      return "Sort [" + sortdesc + "]";
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(p);
    }
 }

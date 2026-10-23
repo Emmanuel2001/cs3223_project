@@ -76,4 +76,12 @@ public class ProductPlan implements Plan {
    public Schema schema() {
       return schema;
    }
+
+   public String describe() {
+      return "Product";
+   }
+
+   public java.util.List<Plan> children() {
+      return java.util.Arrays.asList(p1, p2);
+   }
 }
